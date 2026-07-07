@@ -13,7 +13,8 @@ A [PCBS2.XPL](https://github.com/PCBSPartCreator/PCBS2.XPL) addon that registers
 
 Define a socket with an ID and a Display name in a small `.ini` file, and the game treats it as a first-class socket: it has a proper name, custom CPUs and motherboards can use it, and it shows up correctly in the parts-shop **socket filter** and matches there. This makes it possible to ship fictional or next-gen platforms (a new AMD/Intel socket) as fully buildable parts.
 
-[✨ Features](#-features) • [🔧 Requirements](#-requirements) • [📦 Installation](#-installation) • [⚙️ Configuration](#️-configuration) • [🛠 Building from Source](#-building-from-source) • [🔬 How It Works](#-how-it-works)  [📖 Usage Notes](#-usage-notes) • [🐛 Troubleshooting](#-troubleshooting) • [© Credits](#-credits)
+[✨ Features](#-features) • [🔧 Requirements](#-requirements) • [📦 Installation](#-installation) • [⚙️ Configuration](#️-configuration) • [🛠 Building from Source](#-building-from-source) • [🔬 How It Works](#-how-it-works)  
+[📖 Usage Notes](#-usage-notes) • [🐛 Troubleshooting](#-troubleshooting) • [© Credits](#-credits)
 
 </div>
 

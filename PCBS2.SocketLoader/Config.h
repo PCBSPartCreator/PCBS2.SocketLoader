@@ -14,6 +14,7 @@ namespace SocketLoader {
         bool logResolveSteps = false;
         bool resolveEnabled = true;
         bool patchEnabled = true;
+        bool patchCoolerCompatibility = true;
         bool hookFilter = true;
         bool debugFilter = false;
     };

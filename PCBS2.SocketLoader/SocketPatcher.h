@@ -21,9 +21,6 @@ namespace SocketLoader {
         bool m_done = false;
         bool m_disabled = false;
         bool m_loggedWaiting = false;
-        bool m_namesDone = false;
-        bool m_namesOk = false;
         int  m_pollCount = 0;
     };
-
 }

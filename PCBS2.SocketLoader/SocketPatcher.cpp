@@ -9,8 +9,6 @@ namespace SocketLoader {
 
     namespace {
 
-        const uintptr_t kArrayHeader = 0x20;  // il2cpp array data starts after the 0x20 header (x64)
-
         int MaxEnabledId(const std::vector<SocketEntry>& sockets) {
             int maxId = -1;
             for (size_t i = 0; i < sockets.size(); ++i) {
@@ -21,11 +19,10 @@ namespace SocketLoader {
         }
 
         void* ElementClassOf(const Il2CppApi& api, void* array) {
-            if (!array)
-                return nullptr;
-            void* arrayClass = *(void**)array;  // klass ptr at offset 0
+            void* arrayClass = Il2CppLayout::ObjectClass(array);
             if (!arrayClass)
                 return nullptr;
+
             return api.class_get_element_class(arrayClass);
         }
 
@@ -36,25 +33,54 @@ namespace SocketLoader {
 
         bool PatchNamesArray(const Il2CppApi& api, void* field, void* curArr,
             const std::vector<SocketEntry>& sockets, Logger& log) {
-            const uintptr_t elemSize = 8;
-            uintptr_t oldLen = api.array_length(curArr);
-            uintptr_t newLen = NewLength(oldLen, MaxEnabledId(sockets));
-            log.Info("Patch: s_names oldLen=" + std::to_string(oldLen) + " newLen=" + std::to_string(newLen));
+            const uintptr_t oldLen = api.array_length(curArr);
+            const uintptr_t newLen = NewLength(
+                oldLen,
+                MaxEnabledId(sockets));
+
+            log.Info(
+                "Patch: s_names oldLen=" +
+                std::to_string(oldLen) +
+                " newLen=" +
+                std::to_string(newLen));
+
+            if (!Il2CppLayout::ArrayLayoutMatches(curArr, oldLen)) {
+                log.Error(
+                    "Patch: s_names uses an unexpected IL2CPP array layout");
+                return false;
+            }
 
             void* elemClass = ElementClassOf(api, curArr);
             if (!elemClass) { log.Error("Patch: s_names element class unavailable"); return false; }
 
             void* newArr = api.array_new(elemClass, newLen);
-            if (!newArr) { log.Error("Patch: failed to allocate new s_names array"); return false; }
+            if (!newArr) {
+                log.Error("Patch: failed to allocate new s_names array");
+                return false;
+            }
 
-            std::memcpy((void*)((uintptr_t)newArr + kArrayHeader),
-                (void*)((uintptr_t)curArr + kArrayHeader),
-                (size_t)(oldLen * elemSize));
+            if (!Il2CppLayout::ArrayLayoutMatches(newArr, newLen)) {
+                log.Error(
+                    "Patch: allocated s_names array uses an unexpected layout");
+                return false;
+            }
+
+            void** const oldData =
+                Il2CppLayout::ArrayData<void*>(curArr);
+
+            void** const newData =
+                Il2CppLayout::ArrayData<void*>(newArr);
+
+            std::memcpy(
+                newData,
+                oldData,
+                static_cast<size_t>(oldLen * sizeof(void*)));
 
             // fill the gap ids with "" so nothing stays null
             void* emptyStr = api.string_new("");
+
             for (uintptr_t i = oldLen; i < newLen; ++i)
-                *(void**)((uintptr_t)newArr + kArrayHeader + i * elemSize) = emptyStr;
+                newData[i] = emptyStr;
 
             for (size_t i = 0; i < sockets.size(); ++i) {
                 const SocketEntry& e = sockets[i];
@@ -67,7 +93,7 @@ namespace SocketLoader {
                     continue;
                 }
                 void* str = api.string_new(e.displayName.c_str());
-                *(void**)((uintptr_t)newArr + kArrayHeader + (uintptr_t)e.id * elemSize) = str;
+                newData[static_cast<uintptr_t>(e.id)] = str;
                 log.Info("Patch: s_names[" + std::to_string(e.id) + "] = \"" + e.displayName + "\"");
             }
 
@@ -85,20 +111,48 @@ namespace SocketLoader {
 
         bool PatchUsedArray(const Il2CppApi& api, void* field, void* curArr,
             const std::vector<SocketEntry>& sockets, Logger& log) {
-            const uintptr_t elemSize = 1;
-            uintptr_t oldLen = api.array_length(curArr);
-            uintptr_t newLen = NewLength(oldLen, MaxEnabledId(sockets));
-            log.Info("Patch: s_used oldLen=" + std::to_string(oldLen) + " newLen=" + std::to_string(newLen));
+            const uintptr_t oldLen = api.array_length(curArr);
+            const uintptr_t newLen = NewLength(
+                oldLen,
+                MaxEnabledId(sockets));
+
+            log.Info(
+                "Patch: s_used oldLen=" +
+                std::to_string(oldLen) +
+                " newLen=" +
+                std::to_string(newLen));
+
+            if (!Il2CppLayout::ArrayLayoutMatches(curArr, oldLen)) {
+                log.Error(
+                    "Patch: s_used uses an unexpected IL2CPP array layout");
+                return false;
+            }
 
             void* elemClass = ElementClassOf(api, curArr);
             if (!elemClass) { log.Error("Patch: s_used element class unavailable"); return false; }
 
             void* newArr = api.array_new(elemClass, newLen);
-            if (!newArr) { log.Error("Patch: failed to allocate new s_used array"); return false; }
+            if (!newArr) {
+                log.Error("Patch: failed to allocate new s_used array");
+                return false;
+            }
 
-            std::memcpy((void*)((uintptr_t)newArr + kArrayHeader),
-                (void*)((uintptr_t)curArr + kArrayHeader),
-                (size_t)(oldLen * elemSize));
+            if (!Il2CppLayout::ArrayLayoutMatches(newArr, newLen)) {
+                log.Error(
+                    "Patch: allocated s_used array uses an unexpected layout");
+                return false;
+            }
+
+            const uint8_t* const oldData =
+                Il2CppLayout::ArrayData<uint8_t>(curArr);
+
+            uint8_t* const newData =
+                Il2CppLayout::ArrayData<uint8_t>(newArr);
+
+            std::memcpy(
+                newData,
+                oldData,
+                static_cast<size_t>(oldLen));
 
             for (size_t i = 0; i < sockets.size(); ++i) {
                 const SocketEntry& e = sockets[i];
@@ -106,7 +160,7 @@ namespace SocketLoader {
                     continue;
                 if (e.id < 0 || (uintptr_t)e.id >= newLen)
                     continue;
-                *(uint8_t*)((uintptr_t)newArr + kArrayHeader + (uintptr_t)e.id * elemSize) = 1;
+                newData[static_cast<uintptr_t>(e.id)] = 1;
                 log.Info("Patch: s_used[" + std::to_string(e.id) + "] = true");
             }
 
@@ -164,15 +218,40 @@ namespace SocketLoader {
         }
 
         log.Info("Patch: applying custom sockets (PatchEnabled=true)");
-        bool okNames = PatchNamesArray(api, targets.sNamesField, namesArr, sockets, log);
-        bool okUsed = PatchUsedArray(api, targets.sUsedField, usedArr, sockets, log);
+
+        const bool okNames = 
+            PatchNamesArray(api, targets.sNamesField, namesArr, sockets, log);
+
+        const bool okUsed = 
+            okNames &&
+            PatchUsedArray(api, targets.sUsedField, usedArr, sockets, log);
+
+        if (!okNames || !okUsed) {
+            api.field_static_set_value(targets.sNamesField, namesArr);
+            api.field_static_set_value(targets.sUsedField, usedArr);
+
+            void* restoredNames = nullptr;
+            void* restoredUsed = nullptr;
+
+            api.field_static_get_value(targets.sNamesField, &restoredNames);
+            api.field_static_get_value(targets.sUsedField, &restoredUsed);
+
+            if (restoredNames == namesArr && restoredUsed == usedArr) {
+                log.Warn(
+                    "Patch: failed; original socket arrays were restored");
+            }
+            else {
+                log.Error(
+                    "Patch: failed and rollback verification also failed");
+            }
+
+            m_disabled = true;
+            return false;
+
+        }
 
         m_done = true;
-        if (okNames && okUsed)
-            log.Info("Patch: custom sockets applied successfully");
-        else
-            log.Warn("Patch: completed with errors (see above)");
+        log.Info("Patch: custom sockets applied successfully");
         return true;
     }
-
 }

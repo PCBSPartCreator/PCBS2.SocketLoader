@@ -8,8 +8,6 @@ namespace SocketLoader {
 
     namespace {
 
-        const uintptr_t kArrayHeader = 0x20;
-
         const char* kFilterNamespace = "PCBS2.UI.Filters";
         const char* kFilterClass = "FilterHolder";
         const char* kSocketsField = "motherboardSockets";
@@ -18,10 +16,19 @@ namespace SocketLoader {
         std::string ReadString(void* strObj) {
             if (!strObj)
                 return "(null)";
-            int len = *(int*)((uintptr_t)strObj + 0x10);
+
+            const int32_t len =
+                Il2CppLayout::StringLength(strObj);
+
             if (len < 0 || len > 512)
                 return "(bad len)";
-            const uint16_t* chars = (const uint16_t*)((uintptr_t)strObj + 0x14);
+
+            const uint16_t* chars =
+                Il2CppLayout::StringChars(strObj);
+
+            if (!chars)
+                return "(bad data)";
+
             std::string out;
             for (int i = 0; i < len; ++i) {
                 uint16_t c = chars[i];
@@ -39,10 +46,24 @@ namespace SocketLoader {
                 log.Info("FilterProbe: s_names is null");
                 return;
             }
-            uintptr_t len = api.array_length(arr);
+            const uintptr_t len = api.array_length(arr);
             std::string name = "(out of range)";
-            if (index >= 0 && (uintptr_t)index < len) {
-                void* strObj = *(void**)((uintptr_t)arr + kArrayHeader + (uintptr_t)index * 8);
+
+            if (!Il2CppLayout::ArrayLayoutMatches(arr, len)) {
+                log.Error(
+                    "FilterProbe: s_names uses an unexpected "
+                    "IL2CPP array layout");
+                return;
+            }
+
+            if (index >= 0 &&
+                static_cast<uintptr_t>(index) < len) {
+                void* const* data =
+                    Il2CppLayout::ArrayData<void*>(arr);
+
+                void* strObj =
+                    data[static_cast<uintptr_t>(index)];
+
                 name = ReadString(strObj);
             }
             log.Info("FilterProbe: s_names len=" + std::to_string(len) +
@@ -90,18 +111,30 @@ namespace SocketLoader {
         if (!arr)  // filter not built yet
             return;
 
-        uintptr_t len = api.array_length(arr);
-        if (arr == m_lastArr && len == m_lastLen)  // nothing changed since last log
+        const uintptr_t len = api.array_length(arr);
+
+        if (!Il2CppLayout::ArrayLayoutMatches(arr, len)) {
+            log.Error(
+                "FilterProbe: motherboardSockets uses an unexpected "
+                "IL2CPP array layout");
+            m_disabled = true;
+            return;
+        }
+
+        if (arr == m_lastArr && len == m_lastLen)
             return;
 
         m_lastArr = arr;
         m_lastLen = len;
 
         std::string values;
-        // CpuSocket is an int enum - 4 bytes each
+
         const uintptr_t cap = len < 128 ? len : 128;
+        const int* const data =
+            Il2CppLayout::ArrayData<int>(arr);
+
         for (uintptr_t i = 0; i < cap; ++i) {
-            int v = *(int*)((uintptr_t)arr + kArrayHeader + i * 4);
+            const int v = data[i];
             if (!values.empty())
                 values += ", ";
             values += std::to_string(v);

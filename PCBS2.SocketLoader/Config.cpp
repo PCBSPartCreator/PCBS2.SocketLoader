@@ -37,6 +37,7 @@ namespace SocketLoader {
             "[Runtime]\r\n"
             "ResolveEnabled=true\r\n"
             "PatchEnabled=true\r\n"
+            "PatchCoolerCompatibility=true\r\n"
             "HookFilter=true\r\n"
             "LogResolveSteps=false\r\n"
             "DebugFilter=false\r\n";
@@ -97,16 +98,72 @@ namespace SocketLoader {
                     if (s.Has("LogConfig") && IniParseBool(s.GetString("LogConfig"), b))         cfg.logConfig = b;
                 }
                 else if (IniEquals(s.name, "Runtime")) {
-                    if (s.Has("LogResolveSteps") && IniParseBool(s.GetString("LogResolveSteps"), b)) cfg.logResolveSteps = b;
-                    if (s.Has("ResolveEnabled") && IniParseBool(s.GetString("ResolveEnabled"), b))  cfg.resolveEnabled = b;
-                    if (s.Has("DebugFilter") && IniParseBool(s.GetString("DebugFilter"), b))     cfg.debugFilter = b;
-                    if (s.Has("HookFilter") && IniParseBool(s.GetString("HookFilter"), b))      cfg.hookFilter = b;
-                    if (s.Has("PatchEnabled") && IniParseBool(s.GetString("PatchEnabled"), b))    cfg.patchEnabled = b;
+                    if (s.Has("LogResolveSteps") &&
+                        IniParseBool(s.GetString("LogResolveSteps"), b))
+                        cfg.logResolveSteps = b;
+
+                    if (s.Has("ResolveEnabled") &&
+                        IniParseBool(s.GetString("ResolveEnabled"), b))
+                        cfg.resolveEnabled = b;
+
+                    if (s.Has("DebugFilter") &&
+                        IniParseBool(s.GetString("DebugFilter"), b))
+                        cfg.debugFilter = b;
+
+                    if (s.Has("HookFilter") &&
+                        IniParseBool(s.GetString("HookFilter"), b))
+                        cfg.hookFilter = b;
+
+                    if (s.Has("PatchEnabled") &&
+                        IniParseBool(s.GetString("PatchEnabled"), b))
+                        cfg.patchEnabled = b;
+
+                    if (s.Has("PatchCoolerCompatibility") &&
+                        IniParseBool(
+                            s.GetString("PatchCoolerCompatibility"),
+                            b))
+                        cfg.patchCoolerCompatibility = b;
                 }
             }
 
-            log.Info(std::string("Config: EnableSockets=") + BoolText(cfg.enableSockets) +
-                " PatchEnabled=" + BoolText(cfg.patchEnabled));
+            log.Info(
+                std::string("Config: EnableSockets=") +
+                BoolText(cfg.enableSockets) +
+                " PatchEnabled=" +
+                BoolText(cfg.patchEnabled) +
+                " PatchCoolerCompatibility=" +
+                BoolText(cfg.patchCoolerCompatibility));
+        }
+
+        void NormalizeAddonConfig(
+            Logger& log,
+            AddonConfig& cfg)
+        {
+            if (!cfg.enableSockets)
+                return;
+
+            if (!cfg.resolveEnabled) {
+                cfg.patchEnabled = false;
+                cfg.patchCoolerCompatibility = false;
+                cfg.hookFilter = false;
+                cfg.debugFilter = false;
+
+                log.Warn(
+                    "Config: ResolveEnabled=false; "
+                    "PatchEnabled, PatchCoolerCompatibility, "
+                    "HookFilter and DebugFilter were disabled");
+
+                return;
+            }
+
+            if (!cfg.patchEnabled &&
+                cfg.patchCoolerCompatibility) {
+                cfg.patchCoolerCompatibility = false;
+
+                log.Warn(
+                    "Config: PatchEnabled=false; "
+                    "PatchCoolerCompatibility was disabled");
+            }
         }
 
         void LoadSockets(const std::string& path, Logger& log, bool logEntries, std::vector<SocketEntry>& out) {
@@ -171,8 +228,22 @@ namespace SocketLoader {
             log.Raw("------------------- Summary -------------------");
             log.Info(std::string("Sockets:      ") + (cfg.addon.enableSockets ? "enabled" : "disabled") +
                 ", " + std::to_string(cfg.sockets.size()) + " valid");
-            log.Info(std::string("ResolveEnabled: ") + BoolText(cfg.addon.resolveEnabled));
-            log.Info(std::string("PatchEnabled:   ") + BoolText(cfg.addon.patchEnabled));
+            log.Info(
+                std::string("ResolveEnabled:          ") +
+                BoolText(cfg.addon.resolveEnabled));
+
+            log.Info(
+                std::string("PatchEnabled:            ") +
+                BoolText(cfg.addon.patchEnabled));
+
+            log.Info(
+                std::string("PatchCoolerCompatibility: ") +
+                BoolText(
+                    cfg.addon.patchCoolerCompatibility));
+
+            log.Info(
+                std::string("HookFilter:              ") +
+                BoolText(cfg.addon.hookFilter));
 
             if (cfg.addon.enableSockets && cfg.sockets.empty())
                 log.Warn("Sockets enabled but no valid entries were loaded");
@@ -187,6 +258,7 @@ namespace SocketLoader {
         EnsureConfigFiles(paths, log);
 
         LoadAddonConfig(paths.configFile, log, out.addon);
+        NormalizeAddonConfig(log, out.addon);
 
         if (out.addon.enableSockets)
             LoadSockets(paths.socketsFile, log, out.addon.logConfig, out.sockets);

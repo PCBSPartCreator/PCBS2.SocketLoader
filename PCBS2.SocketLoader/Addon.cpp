@@ -10,7 +10,7 @@ namespace SocketLoader {
     }
 
     const char* Addon::Name() { return "PCBS2.SocketLoader"; }
-    const char* Addon::Version() { return "1.0.0"; }
+    const char* Addon::Version() { return "1.0.1"; }
 
     bool Addon::Initialize(const char* gameDir) {
         if (m_initialized)
@@ -40,17 +40,25 @@ namespace SocketLoader {
     }
 
     void Addon::Tick() {
-        if (m_settled)
-            return;
-        if (!m_initialized)
+        if (m_settled || !m_initialized)
             return;
 
         ++m_tickCount;
 
-        if (m_config.addon.enableSockets)
-            m_runtime.Poll(m_log);
+        if (!m_config.addon.enableSockets || 
+            !m_config.addon.resolveEnabled) {
+            m_settled = true;
+            return;
+        }
 
-        if (!(m_config.addon.enableSockets && m_runtime.IsReady()))
+        m_runtime.Poll(m_log);
+
+        if (m_runtime.GetPhase() == Runtime::Phase::Failed) {
+            m_settled = true;
+            return;
+        }
+
+        if (!m_runtime.IsReady())
             return;
 
         // one setup step per tick - doing it all in one tick froze a frame for ~30ms
@@ -61,43 +69,105 @@ namespace SocketLoader {
             return;
         }
 
-        if (!m_hookInit) {
+        if (m_config.addon.hookFilter && !m_hookInit) {
             m_hookInit = true;
             m_hookReady = Hook::Init(m_log);
+
+            if (!m_hookReady)
+                m_filterHookAttempted = true;
+
             return;
         }
 
         if (m_config.addon.resolveEnabled && !m_resolveAttempted) {
             m_resolveAttempted = true;
-            m_socketResolver.Resolve(m_runtime.Api(), m_log, m_config.addon.logResolveSteps);
+
+            if (!m_socketResolver.Resolve(
+                    m_runtime.Api(),
+                    m_log,
+                    m_config.addon.logResolveSteps)) {
+                m_settled = true;
+            }
+            
             return;
         }
 
         if (m_hookReady && m_config.addon.hookFilter && m_socketResolver.IsResolved() &&
-            !m_filterHookInstalled) {
-            m_filterHookInstalled = true;
-            m_filterHook.Install(m_runtime.Api(), m_socketResolver.Handles(),
-                m_config.sockets, m_log);
+            !m_filterHookAttempted) {
+            m_filterHookAttempted = true;
+            m_filterHookInstalled = m_filterHook.Install(
+                m_runtime.Api(), 
+                m_socketResolver.Handles(),
+                m_config.sockets, 
+                m_log);
             return;
         }
 
-        if (m_config.addon.patchEnabled && m_socketResolver.IsResolved() &&
+        if (m_config.addon.patchEnabled &&
+            m_socketResolver.IsResolved() &&
             !m_socketPatcher.Finished()) {
-            m_socketPatcher.Poll(m_runtime.Api(), m_socketResolver.Handles(),
-                m_config.sockets, m_log);
+            m_socketPatcher.Poll(
+                m_runtime.Api(),
+                m_socketResolver.Handles(),
+                m_config.sockets,
+                m_log);
+
             return;
         }
 
-        if (m_config.addon.debugFilter && m_socketResolver.IsResolved())
-            m_filterProbe.Poll(m_runtime.Api(), m_socketResolver.Handles(), m_log);
+        if (m_config.addon.patchCoolerCompatibility &&
+            !m_config.sockets.empty() &&
+            m_socketPatcher.Finished() &&
+            !m_socketPatcher.IsDone() &&
+            !m_coolerPatchSkipped) {
+            m_coolerPatchSkipped = true;
+
+            m_log.Warn(
+                "CoolerPatch: skipped because the core "
+                "socket patch did not complete successfully");
+
+            return;
+        }
+
+        if (m_config.addon.patchCoolerCompatibility &&
+            !m_config.sockets.empty() &&
+            m_socketPatcher.IsDone() &&
+            !m_coolerPatcher.Finished()) {
+            m_coolerPatcher.Poll(
+                m_runtime.Api(),
+                m_socketResolver.Handles(),
+                m_config.sockets,
+                m_log);
+
+            return;
+        }
+
+        if (m_config.addon.debugFilter &&
+            m_socketResolver.IsResolved()) {
+            m_filterProbe.Poll(
+                m_runtime.Api(),
+                m_socketResolver.Handles(),
+                m_log);
+        }
 
         // setup is one-time; XPL ticks this per il2cpp_runtime_invoke, so go idle once nothing is left
         if (!m_config.addon.debugFilter
-            && (!m_config.addon.resolveEnabled || m_resolveAttempted)
-            && (!m_config.addon.patchEnabled || m_socketPatcher.Finished())
-            && (!m_config.addon.hookFilter || m_filterHookInstalled
-                || (m_resolveAttempted && !m_socketResolver.IsResolved())))
+            && (!m_config.addon.resolveEnabled ||
+                m_resolveAttempted)
+            && (!m_config.addon.patchEnabled ||
+                m_socketPatcher.Finished())
+            && (!m_config.addon.patchCoolerCompatibility ||
+                m_config.sockets.empty() ||
+                m_coolerPatcher.Finished() ||
+                m_coolerPatchSkipped)
+            && (!m_config.addon.hookFilter ||
+                m_config.sockets.empty() ||
+                m_filterHookAttempted ||
+                (m_resolveAttempted &&
+                    !m_socketResolver.IsResolved())))
+        {
             m_settled = true;
+        }
     }
 
     void Addon::Shutdown() {

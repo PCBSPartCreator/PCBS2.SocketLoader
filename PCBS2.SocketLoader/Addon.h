@@ -6,6 +6,7 @@
 #include "Runtime.h"
 #include "SocketResolver.h"
 #include "SocketPatcher.h"
+#include "CoolerPatcher.h"
 #include "FilterProbe.h"
 #include "HookManager.h"
 #include "FilterHook.h"
@@ -35,6 +36,7 @@ namespace SocketLoader {
         Runtime            m_runtime;
         SocketResolver     m_socketResolver;
         SocketPatcher      m_socketPatcher;
+        CoolerPatcher      m_coolerPatcher;
         FilterProbe        m_filterProbe;
         FilterHook         m_filterHook;
         unsigned long long m_tickCount = 0;
@@ -42,7 +44,9 @@ namespace SocketLoader {
         bool               m_resolveAttempted = false;
         bool               m_hookInit = false;
         bool               m_hookReady = false;
+        bool               m_filterHookAttempted = false;
         bool               m_filterHookInstalled = false;
+        bool               m_coolerPatchSkipped = false;
         bool               m_settled = false;
     };
 

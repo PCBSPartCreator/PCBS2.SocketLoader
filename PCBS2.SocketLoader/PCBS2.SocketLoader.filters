@@ -31,15 +31,18 @@
       <Filter>Headerdateien\Core</Filter>
     </ClInclude>
     <ClInclude Include="Config.h">
-      <Filter>Headerdateien\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="ini.h">
+    <Filter>Headerdateien\Core</Filter>
+	</ClInclude>
+	<ClInclude Include="CoolerPatcher.h">
+    <Filter>Headerdateien\Core</Filter>
+	</ClInclude>
+    <ClInclude Include="Ini.h">
       <Filter>Headerdateien\Core</Filter>
     </ClInclude>
     <ClInclude Include="Runtime.h">
       <Filter>Headerdateien\Core</Filter>
     </ClInclude>
-    <ClInclude Include="IL2cppAPI.h">
+    <ClInclude Include="Il2CppApi.h">
       <Filter>Headerdateien\Core</Filter>
     </ClInclude>
     <ClInclude Include="SocketResolver.h">
@@ -68,16 +71,19 @@
     <ClCompile Include="Paths.cpp">
       <Filter>Quelldateien\Core</Filter>
     </ClCompile>
-    <ClCompile Include="Config.cpp">
-      <Filter>Quelldateien\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="ini.cpp">
+	<ClCompile Include="Config.cpp">
+		<Filter>Quelldateien\Core</Filter>
+	</ClCompile>
+	<ClCompile Include="CoolerPatcher.cpp">
+		<Filter>Quelldateien\Core</Filter>
+	</ClCompile>
+    <ClCompile Include="Ini.cpp">
       <Filter>Quelldateien\Core</Filter>
     </ClCompile>
     <ClCompile Include="Runtime.cpp">
       <Filter>Quelldateien\Core</Filter>
     </ClCompile>
-    <ClCompile Include="IL2cppAPI.cpp">
+    <ClCompile Include="Il2CppApi.cpp">
       <Filter>Quelldateien\Core</Filter>
     </ClCompile>
     <ClCompile Include="SocketResolver.cpp">

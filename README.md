@@ -2,7 +2,7 @@
 
 <img src="assets/SocketLoader Logo.png" alt="CustomStickerImporter Logo"  width="560" />  </br>
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/PCBSPartCreator/PCBS2.SocketLoader/releases)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/PCBSPartCreator/PCBS2.SocketLoader/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/PCBSPartCreator/PCBS2.SocketLoader/blob/main/LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](https://github.com/PCBSPartCreator/PCBS2.SocketLoader/blob/main)
 [![Game](https://img.shields.io/badge/game-PC%20Building%20Simulator%202-orange.svg)](https://www.pcbuildingsim.com/)
@@ -75,7 +75,7 @@ The addon writes `PCBS2.SocketLoader.log` inside its folder. A healthy run looks
 
 ```
 ==================================================
- PCBS2.SocketLoader v1.0.0
+ PCBS2.SocketLoader v1.0.1
 ==================================================
 [i] Initialize
 [i] Addon directory: ...\addons\PCBS2.SocketLoader\
@@ -84,6 +84,8 @@ The addon writes `PCBS2.SocketLoader.log` inside its folder. A healthy run looks
 [i] Patch: s_names[100] = "AM6"
 [i] Patch: s_used[100] = true
 [i] Patch: custom sockets applied successfully
+[i] CoolerPatch: updated 42 part(s), added 42 socket compatibility entries
+[i] CoolerPatch: completed successfully
 ```
 
 ## ⚙️ Configuration
@@ -112,15 +114,16 @@ Behaviour switches. The defaults are what you want for normal use; the rest are 
 
 ```ini
 [General]
-EnableSockets=true      ; master switch for the whole addon
-LogConfig=false         ; log the parsed config back out
+EnableSockets=true            ; master switch for the whole addon
+LogConfig=false               ; log the parsed config back out
 
 [Runtime]
-ResolveEnabled=true     ; resolve the game's socket classes (required for anything to work)
-PatchEnabled=true       ; register the custom sockets (names + usable flags)
-HookFilter=true         ; fix the parts-shop socket filter for custom sockets
-LogResolveSteps=false   ; verbose resolve logging
-DebugFilter=false       ; verbose filter-hook diagnostics
+ResolveEnabled=true           ; resolve the game's socket classes (required for anything to work)
+PatchEnabled=true             ; register the custom sockets (names + usable flags)
+PatchCoolerCompatibility=true ; make coolers / CPU blocks compatible with the custom sockets
+HookFilter=true               ; fix the parts-shop socket filter for custom sockets
+LogResolveSteps=false         ; verbose resolve logging
+DebugFilter=false             ; verbose filter-hook diagnostics
 ```
 
 ## 🛠 Building from Source
@@ -151,6 +154,7 @@ No third-party libraries are vendored and there is **no MinHook dependency**. Al
 | `Runtime.*` / `IL2cppAPI.*` | IL2CPP runtime access and class/field lookup                       |
 | `SocketResolver.*` | Resolves the game's socket classes and fields by name                      |
 | `SocketPatcher.*`  | Extends the socket name / usable arrays with the custom sockets            |
+| `CoolerPatcher.*`  | Adds the custom sockets to cooler / CPU-block compatibility lists          |
 | `FilterHook.*`     | The parts-shop socket-filter hook (installed via `XPL_CreateHook`)         |
 | `HookManager.*`    | Thin wrapper over `XPL_CreateHook`                                          |
 | `Log.h`            | Win32-backed logger                                                        |
@@ -162,8 +166,9 @@ PC Building Simulator 2 is a 64-bit Unity IL2CPP game whose sockets live in fixe
 1. **Load** - PCBS2.XPL calls `XPL_Initialize`. The addon resolves its paths, creates the config files if missing, and reads `sockets.ini`.
 2. **Resolve** - On the first ticks it locates the game's socket classes and the arrays that hold socket names and usable flags, all by name so a game update rarely breaks it.
 3. **Register** - It rebuilds those arrays to include the custom sockets: each socket's ID gets its display name, and its "usable" flag is set so CPUs and motherboards using that ID can be installed.
-4. **Fix the filter** - It installs a single hook (through `XPL_CreateHook`) on the parts-shop socket filter. For parts that use a custom socket, the hook returns the custom socket name, so the socket appears in the filter dropdown and parts match against it correctly.
-5. **Go idle** - Once registration and the hook are in place, there is nothing left to do, so the addon settles and stops doing per-tick work.
+4. **Make coolers compatible** - Once the parts database has populated, it adds every custom socket to the compatibility list of all air coolers, liquid coolers and CPU blocks, so any cooler mounts on the new sockets. This step can be turned off with `PatchCoolerCompatibility`.
+5. **Fix the filter** - It installs a single hook (through `XPL_CreateHook`) on the parts-shop socket filter. For parts that use a custom socket, the hook returns the custom socket name, so the socket appears in the filter dropdown and parts match against it correctly.
+6. **Go idle** - Once registration and the hook are in place, there is nothing left to do, so the addon settles and stops doing per-tick work.
 
 ```
 XPL_Initialize
@@ -174,6 +179,9 @@ Resolve (first ticks)
      ▼
 Register
      │  extend arrays: ID -> name, mark usable
+     ▼
+Cooler patch (PatchCoolerCompatibility)
+     │  add custom sockets to cooler / CPU-block lists
      ▼
 Filter hook (via XPL_CreateHook)
      │  return custom name for custom-socket parts
@@ -193,7 +201,7 @@ SocketLoader registers the *socket* - it does not create CPUs or motherboards. T
 
 ### Note 3: Cooler compatibility
 
-A custom socket is its own platform, so it needs its own compatible coolers - it does not inherit another socket's cooler list. Provide coolers that list the custom socket if you want cooling options for it.
+A custom socket is its own platform and normally wouldn't inherit any other socket's cooler list. To avoid leaving new sockets without cooling options, the addon's **CoolerPatcher** automatically registers every custom socket with all air coolers, liquid coolers and CPU blocks at startup, so any cooler fits your new socket out of the box. It is on by default and can be turned off with `PatchCoolerCompatibility` in `PCBS2.SocketLoader.ini`.
 
 ### Note 4: Removing the addon and save safety
 
@@ -235,6 +243,16 @@ Most issues can be read straight from `PCBS2.SocketLoader.log` in the addon fold
 
 - Confirm `HookFilter=true` in `PCBS2.SocketLoader.ini`.
 - Check the log for the filter hook being installed. If it isn't, set `DebugFilter=true` temporarily and re-check the log for details, then report it.
+
+### No coolers are compatible with a custom socket
+
+**Symptoms**: A custom socket works when building, but no cooler (or CPU block) can be installed on it.
+
+**Solutions**:
+
+- Confirm `PatchCoolerCompatibility=true` in `PCBS2.SocketLoader.ini`.
+- If you upgraded from an older version, your `PCBS2.SocketLoader.ini` may predate this option and not contain the `PatchCoolerCompatibility` line. Delete the file and relaunch the game - the addon recreates it with the current defaults. Your `sockets.ini` is left untouched.
+- Check the log for the cooler patch running (it reports how many coolers / CPU blocks were updated). `CoolerPatch: skipped ...` means the core socket patch didn't complete - fix that first.
 
 ### "Resolve failed" / class or field not found
 
